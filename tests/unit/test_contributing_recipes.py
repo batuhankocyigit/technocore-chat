@@ -105,7 +105,14 @@ def recipe_names(justfile: Path) -> set[str]:
             check=True,
         )
         return set(listed.stdout.split())
-    header = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*)[^:=]*:(?!=)")
+    # `[^:]*`, not `[^:=]*`: a parameter with a default (`serve port="8080":`, `mutate
+    # children="4":`) puts an `=` before the header's colon, and excluding it stopped the
+    # match before that colon — every default-valued recipe went uncounted, so a
+    # contributor running bare `pytest` (no `just` on PATH) saw `serve`/`mutate` reported
+    # as undefined even though the justfile defines them. The `:=` lookahead below is what
+    # keeps a `set name := value` line from matching; the parameter list itself may
+    # contain `=` freely.
+    header = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*)[^:]*:(?!=)")
     names = set()
     for line in justfile.read_text(encoding="utf-8").splitlines():
         if line[:1].strip() and not line.startswith(("#", "set ", "export ")):

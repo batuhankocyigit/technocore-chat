@@ -951,8 +951,9 @@ def test_an_unparseable_timestamp_counts_as_expired(tmp_path, stamp):
 def test_last_seq_does_not_rewind_when_every_visible_record_expires(tmp_path, monkeypatch):
     """`last_seq` deliberately does NOT filter" is the promise a few lines above it in
     read_messages — a room where every visible record has aged past the TTL must still
-    report its true high-water mark, not fall back to `since` (or 0), or a client reusing
-    the reported last_seq as its next ?since= cursor watches the counter rewind."""
+    report its true high-water mark, not fall back to `since` (or 0). The fallback must
+    not rewind the other way either: a caller whose `since` is already ahead of the room's
+    high-water mark must get its own cursor back, not the smaller discovered seq."""
     import store
 
     real_now = store._now
@@ -964,6 +965,9 @@ def test_last_seq_does_not_rewind_when_every_visible_record_expires(tmp_path, mo
     view = store.read_messages(tmp_path, "e-standup")
     assert view["count"] == 0  # everything really is expired
     assert view["last_seq"] == store.last_seq(tmp_path, "e-standup") == 5
+
+    ahead = store.read_messages(tmp_path, "e-standup", since=10)
+    assert ahead["count"] == 0 and ahead["last_seq"] == 10  # caller's cursor, not rewound
 
 
 def test_ephemeral_ttl_boundary_is_inclusive_then_expires(tmp_path, monkeypatch):

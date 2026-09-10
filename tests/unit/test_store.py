@@ -948,6 +948,24 @@ def test_an_unparseable_timestamp_counts_as_expired(tmp_path, stamp):
     assert store.read_messages(tmp_path, "keeps-it")["count"] == 0  # a different room, empty
 
 
+def test_last_seq_does_not_rewind_when_every_visible_record_expires(tmp_path, monkeypatch):
+    """`last_seq` deliberately does NOT filter" is the promise a few lines above it in
+    read_messages — a room where every visible record has aged past the TTL must still
+    report its true high-water mark, not fall back to `since` (or 0), or a client reusing
+    the reported last_seq as its next ?since= cursor watches the counter rewind."""
+    import store
+
+    real_now = store._now
+    _at(monkeypatch, store, "2020-01-01T00:00:00.000000Z")
+    for _ in range(5):
+        store.append(tmp_path, "e-standup", "bot", "old")
+    monkeypatch.setattr(store, "_now", real_now)
+
+    view = store.read_messages(tmp_path, "e-standup")
+    assert view["count"] == 0  # everything really is expired
+    assert view["last_seq"] == store.last_seq(tmp_path, "e-standup") == 5
+
+
 def test_ephemeral_ttl_boundary_is_inclusive_then_expires(tmp_path, monkeypatch):
     """At exactly TTL the record is still within the promise; one microsecond older is not.
 

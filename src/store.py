@@ -910,7 +910,7 @@ def read_messages(
         "room": room,
         "count": len(out),
         "first_seq": out[0]["seq"] if out else None,
-        "last_seq": out[-1]["seq"] if out else (newest_seq if newest_seq is not None else (since or 0)),
+        "last_seq": out[-1]["seq"] if out else max(since or 0, newest_seq or 0),
         "generation": room_generation(root, room),
         "messages": out,
     }
